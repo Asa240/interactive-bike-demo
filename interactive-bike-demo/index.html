@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Bike Guide</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+            overflow-x: hidden;
+            min-height: 100vh;
+            max-width: 100%;
+        }
+
+        /* Chat widget optimized container */
+        @media (max-width: 400px) {
+            body {
+                font-size: 14px;
+            }
+
+            .bike-viewer {
+                height: 320px;
+            }
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            color: white;
+            padding: 16px 20px;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .header-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+            flex-shrink: 0;
+        }
+
+        .header-icon i {
+            font-size: 16px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #fff 0%, #e2e8f0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.3;
+            margin: 0;
+        }
+
+        .header-instructions {
+            display: none; /* Hide in compact view */
+        }
+
+        .viewer-container {
+            position: relative;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 12px;
+        }
+
+        .bike-viewer {
+            position: relative;
+            width: 100%;
+            height: 420px;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            cursor: grab;
+            user-select: none;
+            box-shadow: 
+                0 0 0 1px rgba(0, 0, 0, 0.05),
+                0 8px 24px -4px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            backdrop-filter: blur(10px);
+            transition: box-shadow 0.3s ease;
+        }
+
+        .bike-viewer:hover {
+            box-shadow: 
+                0 0 0 1px rgba(0, 0, 0, 0.05),
+                0 12px 32px -4px rgba(0, 0, 0, 0.12);
+        }
+
+        .bike-viewer.grabbing {
+            cursor: grabbing;
+        }
+
+        .bike-image-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: 
+                radial-gradient(circle at 50% 120%, rgba(100, 116, 139, 0.03) 0%, transparent 50%);
+        }
+
+        .bike-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.08));
+        }
+
+        .hotspot {
+            position: absolute;
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: 2.5px solid rgba(255, 255, 255, 0.95);
+            border-radius: 50%;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 
+                0 0 0 3px rgba(59, 130, 246, 0.15),
+                0 6px 18px rgba(59, 130, 246, 0.3);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+        }
+
+        .hotspot::before {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.2));
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .hotspot:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translate(-50%, -50%) scale(1.15);
+            box-shadow: 
+                0 0 0 6px rgba(59, 130, 246, 0.2),
+                0 12px 32px rgba(59, 130, 246, 0.4);
+        }
+
+        .hotspot:hover::before {
+            opacity: 1;
+        }
+
+        .hotspot.pulse {
+            animation: pulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 
+                    0 0 0 4px rgba(59, 130, 246, 0.15),
+                    0 8px 24px rgba(59, 130, 246, 0.3),
+                    0 0 0 0 rgba(59, 130, 246, 0);
+            }
+            50% {
+                box-shadow: 
+                    0 0 0 4px rgba(59, 130, 246, 0.15),
+                    0 8px 24px rgba(59, 130, 246, 0.3),
+                    0 0 0 16px rgba(59, 130, 246, 0);
+            }
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 
+                0 0 0 1px rgba(0, 0, 0, 0.05),
+                0 12px 32px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            max-width: 260px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(12px) scale(0.96);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
+        }
+
+        .tooltip.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0) scale(1);
+        }
+
+        .tooltip h3 {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 16px;
+            margin-bottom: 8px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .tooltip p {
+            color: #475569;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 12px;
+            font-weight: 400;
+            letter-spacing: -0.01em;
+        }
+
+        .tooltip-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tooltip a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            text-decoration: none;
+            padding: 9px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            flex: 1;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+            letter-spacing: -0.01em;
+        }
+
+        .tooltip a:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        }
+
+        .tooltip a:active {
+            transform: translateY(0);
+        }
+
+        .tooltip-close {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+            box-shadow: 0 2px 8px rgba(100, 116, 139, 0.2) !important;
+        }
+
+        .tooltip-close:hover {
+            background: linear-gradient(135deg, #475569 0%, #334155 100%) !important;
+            box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3) !important;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 14px;
+            gap: 12px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            background: white;
+            padding: 4px;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+        }
+
+        .control-btn {
+            background: white;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            color: #64748b;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .control-btn:hover {
+            color: white;
+            border-color: #3b82f6;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+        }
+
+        .control-btn:hover::before {
+            opacity: 1;
+        }
+
+        .control-btn span {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn span i {
+            font-size: 13px;
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        .rotation-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 600;
+            background: white;
+            padding: 6px 12px;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            letter-spacing: -0.01em;
+        }
+
+        .rotation-indicator i {
+            font-size: 14px;
+            color: #3b82f6;
+        }
+
+        .rotation-dots {
+            display: flex;
+            gap: 5px;
+        }
+
+        .rotation-dot {
+            width: 6px;
+            height: 6px;
+            background: #cbd5e1;
+            border-radius: 50%;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .rotation-dot.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            transform: scale(1.4);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+        }
+
+        .instructions {
+            display: none; /* Hidden in compact chat widget view */
+        }
+
+        @media (max-width: 768px) {
+            .viewer-container {
+                padding: 10px;
+            }
+
+            .bike-viewer {
+                height: 380px;
+            }
+
+            .controls {
+                padding: 8px 10px;
+                gap: 10px;
+            }
+
+            .control-btn {
+                min-width: 28px;
+                height: 28px;
+            }
+
+            .control-btn span i {
+                font-size: 12px;
+            }
+
+            .rotation-indicator {
+                font-size: 11px;
+                padding: 5px 10px;
+            }
+
+            .rotation-indicator i {
+                font-size: 12px;
+            }
+
+            .rotation-dot {
+                width: 5px;
+                height: 5px;
+            }
+
+            .tooltip {
+                max-width: 240px;
+                padding: 14px;
+            }
+
+            .tooltip h3 {
+                font-size: 15px;
+            }
+
+            .tooltip p {
+                font-size: 12px;
+            }
+
+            .tooltip a {
+                padding: 8px 12px;
+                font-size: 11px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                padding: 12px 16px;
+            }
+
+            .header-icon {
+                width: 28px;
+                height: 28px;
+            }
+
+            .header-icon i {
+                font-size: 14px;
+            }
+
+            .header h1 {
+                font-size: 14px;
+            }
+
+            .viewer-container {
+                padding: 8px;
+            }
+
+            .bike-viewer {
+                height: 350px;
+                border-radius: 12px;
+            }
+
+            .hotspot {
+                width: 30px;
+                height: 30px;
+                font-size: 13px;
+                border-width: 2px;
+            }
+
+            .controls {
+                margin-top: 8px;
+                padding: 6px 8px;
+                gap: 8px;
+            }
+
+            .tooltip {
+                max-width: 220px;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="fa-solid fa-motorcycle"></i>
+            </div>
+            <h1>Bronco E-Bike Interactive Guide</h1>
+            <div class="header-instructions">
+                <div class="instruction-item">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    <span>Drag to rotate</span>
+                </div>
+                <div class="instruction-divider">•</div>
+                <div class="instruction-item">
+                    <i class="fa-solid fa-hand-pointer"></i>
+                    <span>Click hotspots to learn more</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="viewer-container">
+        <div class="bike-viewer" id="bikeViewer">
+            <div class="bike-image-container" id="imageContainer">
+                <img id="bikeImage" class="bike-image" alt="Bronco Bike">
+            </div>
+
+            <!-- Hotspots will be dynamically added here -->
+        </div>
+
+        <div class="controls">
+            <div class="zoom-controls">
+                <button class="control-btn" id="zoomOut" title="Zoom Out"><span>−</span></button>
+                <button class="control-btn" id="resetZoom" title="Reset View"><span>↻</span></button>
+                <button class="control-btn" id="zoomIn" title="Zoom In"><span>+</span></button>
+            </div>
+            
+            <div class="rotation-indicator">
+                <i class="fa-solid fa-compass"></i>
+                <span>View:</span>
+                <div class="rotation-dots" id="rotationDots"></div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <i class="fa-solid fa-lightbulb"></i>
+            <strong>Pro Tip:</strong> Drag left or right to rotate the bike 360°. Click any hotspot for detailed information about that part.
+        </div>
+
+        <div class="tooltip" id="tooltip">
+            <h3 id="tooltipTitle"></h3>
+            <p id="tooltipDesc"></p>
+            <div class="tooltip-actions">
+                <a href="#" id="tooltipLink" target="_blank">Learn More</a>
+                <a href="#" class="tooltip-close" id="closeTooltip">Close</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Image paths - these should be updated to match your hosted images
+        const images = [
+            'MB_BRONCO_BIKE_-_AREA_51_426_25bf555b-ecb1-4d1e-a169-5b392583f85a.webp',
+            'MB_BRONCO_BIKE_-_AREA_51_427_7f59fd7d-6739-47c6-95ff-331f261a1059.webp',
+            'MB_BRONCO_BIKE_408_ff023f33-9da1-4ec3-98be-dcd124520e5c.webp',
+            'MB_BRONCO_BIKE_-_AREA_51_428_34701322-91b6-48a5-83b0-a0e2e1a30f8a.webp',
+            'MB_BRONCO_BIKE_5_4_efaa3fa7-72db-4b54-8526-fec996420777.webp'
+        ];
+
+        // Hotspot data with positions for each view
+        const hotspots = [
+            {
+                id: 'front-wheel',
+                label: '1',
+                title: 'Front Wheel & Fork',
+                description: 'High-performance suspension fork with disc brake system. Designed for all-terrain capability with responsive handling.',
+                link: 'https://example.com/front-wheel',
+                positions: [
+                    { view: 0, x: '65%', y: '65%', visible: true },
+                    { view: 1, x: '70%', y: '65%', visible: true },
+                    { view: 2, x: '25%', y: '65%', visible: true },
+                    { view: 3, x: '30%', y: '65%', visible: true },
+                    { view: 4, x: '50%', y: '40%', visible: false }
+                ]
+            },
+            {
+                id: 'rear-wheel',
+                label: '2',
+                title: 'Rear Wheel & Motor',
+                description: 'Powerful hub motor integrated into the rear wheel. Provides smooth, efficient power delivery with regenerative braking.',
+                link: 'https://example.com/rear-wheel',
+                positions: [
+                    { view: 0, x: '25%', y: '65%', visible: true },
+                    { view: 1, x: '30%', y: '65%', visible: true },
+                    { view: 2, x: '70%', y: '65%', visible: true },
+                    { view: 3, x: '65%', y: '65%', visible: true },
+                    { view: 4, x: '50%', y: '75%', visible: false }
+                ]
+            },
+            {
+                id: 'frame',
+                label: '3',
+                title: 'Frame & Battery',
+                description: 'Aerospace-grade aluminum frame houses a high-capacity lithium battery. Integrated design provides optimal weight distribution and range.',
+                link: 'https://example.com/frame',
+                positions: [
+                    { view: 0, x: '42%', y: '50%', visible: true },
+                    { view: 1, x: '50%', y: '50%', visible: true },
+                    { view: 2, x: '50%', y: '50%', visible: true },
+                    { view: 3, x: '48%', y: '50%', visible: true },
+                    { view: 4, x: '50%', y: '60%', visible: true }
+                ]
+            },
+            {
+                id: 'handlebars',
+                label: '4',
+                title: 'Handlebars & Display',
+                description: 'Ergonomic handlebars with integrated LCD display showing speed, battery level, and ride modes. Features throttle and brake controls.',
+                link: 'https://example.com/handlebars',
+                positions: [
+                    { view: 0, x: '70%', y: '25%', visible: true },
+                    { view: 1, x: '72%', y: '28%', visible: true },
+                    { view: 2, x: '28%', y: '28%', visible: true },
+                    { view: 3, x: '25%', y: '25%', visible: true },
+                    { view: 4, x: '50%', y: '20%', visible: true }
+                ]
+            },
+            {
+                id: 'seat',
+                label: '5',
+                title: 'Seat & Suspension',
+                description: 'Comfort-engineered saddle with adjustable height. Rear suspension system absorbs impacts for a smooth ride on any terrain.',
+                link: 'https://example.com/seat',
+                positions: [
+                    { view: 0, x: '38%', y: '28%', visible: true },
+                    { view: 1, x: '42%', y: '28%', visible: true },
+                    { view: 2, x: '58%', y: '28%', visible: true },
+                    { view: 3, x: '55%', y: '28%', visible: true },
+                    { view: 4, x: '50%', y: '45%', visible: false }
+                ]
+            },
+            {
+                id: 'brakes',
+                label: '6',
+                title: 'Hydraulic Disc Brakes',
+                description: 'Professional-grade hydraulic disc brakes on both wheels. Provides reliable stopping power in all weather conditions.',
+                link: 'https://example.com/brakes',
+                positions: [
+                    { view: 0, x: '60%', y: '50%', visible: true },
+                    { view: 1, x: '63%', y: '52%', visible: true },
+                    { view: 2, x: '37%', y: '52%', visible: true },
+                    { view: 3, x: '35%', y: '50%', visible: true },
+                    { view: 4, x: '50%', y: '35%', visible: false }
+                ]
+            }
+        ];
+
+        let currentImageIndex = 0;
+        let isDragging = false;
+        let startX = 0;
+        let currentX = 0;
+        let zoomLevel = 1;
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let startPanX = 0;
+        let startPanY = 0;
+
+        const bikeViewer = document.getElementById('bikeViewer');
+        const bikeImage = document.getElementById('bikeImage');
+        const imageContainer = document.getElementById('imageContainer');
+        const tooltip = document.getElementById('tooltip');
+        const tooltipTitle = document.getElementById('tooltipTitle');
+        const tooltipDesc = document.getElementById('tooltipDesc');
+        const tooltipLink = document.getElementById('tooltipLink');
+        const closeTooltip = document.getElementById('closeTooltip');
+        const rotationDots = document.getElementById('rotationDots');
+
+        // Initialize
+        function init() {
+            loadImage(currentImageIndex);
+            createRotationDots();
+            createHotspots();
+            setupEventListeners();
+        }
+
+        function loadImage(index) {
+            bikeImage.src = images[index];
+            currentImageIndex = index;
+            updateRotationDots();
+            updateHotspots();
+        }
+
+        function createRotationDots() {
+            images.forEach((_, index) => {
+                const dot = document.createElement('div');
+                dot.className = 'rotation-dot';
+                if (index === 0) dot.classList.add('active');
+                rotationDots.appendChild(dot);
+            });
+        }
+
+        function updateRotationDots() {
+            const dots = rotationDots.querySelectorAll('.rotation-dot');
+            dots.forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentImageIndex);
+            });
+        }
+
+        function createHotspots() {
+            hotspots.forEach(hotspot => {
+                const element = document.createElement('div');
+                element.className = 'hotspot pulse';
+                element.dataset.hotspotId = hotspot.id;
+                element.textContent = hotspot.label;
+                element.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showTooltip(hotspot, element);
+                });
+                imageContainer.appendChild(element);
+            });
+            updateHotspots();
+        }
+
+        function updateHotspots() {
+            if (!imageContainer) return;
+            
+            hotspots.forEach(hotspot => {
+                const element = imageContainer.querySelector(`[data-hotspot-id="${hotspot.id}"]`);
+                if (!element) return;
+                
+                const position = hotspot.positions[currentImageIndex];
+                
+                if (position.visible) {
+                    element.style.display = 'flex';
+                    element.style.left = position.x;
+                    element.style.top = position.y;
+                } else {
+                    element.style.display = 'none';
+                }
+            });
+        }
+
+        function showTooltip(hotspot, element) {
+            if (!tooltip) return;
+            
+            tooltipTitle.textContent = hotspot.title;
+            tooltipDesc.textContent = hotspot.description;
+            tooltipLink.href = hotspot.link;
+
+            // Position tooltip relative to viewer
+            const rect = element.getBoundingClientRect();
+            const viewerRect = bikeViewer.getBoundingClientRect();
+            
+            let left = rect.left - viewerRect.left + rect.width / 2;
+            let top = rect.top - viewerRect.top - 20;
+            
+            // Make sure tooltip stays in bounds
+            tooltip.style.left = Math.max(10, Math.min(left, viewerRect.width - 330)) + 'px';
+            tooltip.style.top = Math.max(10, top) + 'px';
+            tooltip.style.transform = 'translateX(-50%)';
+            
+            tooltip.classList.add('active');
+
+            // Stop pulse animation
+            element.classList.remove('pulse');
+        }
+
+        function hideTooltip() {
+            if (!tooltip) return;
+            tooltip.classList.remove('active');
+            // Restart pulse animations
+            document.querySelectorAll('.hotspot').forEach(h => h.classList.add('pulse'));
+        }
+
+        function setupEventListeners() {
+            // Mouse events
+            bikeViewer.addEventListener('mousedown', handleDragStart);
+            document.addEventListener('mousemove', handleDragMove);
+            document.addEventListener('mouseup', handleDragEnd);
+
+            // Touch events
+            bikeViewer.addEventListener('touchstart', handleDragStart);
+            document.addEventListener('touchmove', handleDragMove);
+            document.addEventListener('touchend', handleDragEnd);
+
+            // Zoom controls
+            document.getElementById('zoomIn').addEventListener('click', () => zoom(0.2));
+            document.getElementById('zoomOut').addEventListener('click', () => zoom(-0.2));
+            document.getElementById('resetZoom').addEventListener('click', resetView);
+
+            // Tooltip close
+            closeTooltip.addEventListener('click', (e) => {
+                e.preventDefault();
+                hideTooltip();
+            });
+
+            // Close tooltip when clicking outside
+            bikeViewer.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('hotspot')) {
+                    hideTooltip();
+                }
+            });
+
+            // Prevent link clicks from bubbling
+            tooltipLink.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+
+        function handleDragStart(e) {
+            if (e.target.classList.contains('hotspot')) return;
+            
+            isDragging = true;
+            bikeViewer.classList.add('grabbing');
+            
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            startX = clientX - currentX;
+
+            if (zoomLevel > 1) {
+                isPanning = true;
+                const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                startPanX = clientX - panX;
+                startPanY = clientY - panY;
+            }
+
+            hideTooltip();
+        }
+
+        function handleDragMove(e) {
+            if (!isDragging) return;
+            
+            e.preventDefault();
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            
+            if (isPanning && zoomLevel > 1) {
+                const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                panX = clientX - startPanX;
+                panY = clientY - startPanY;
+                updateTransform();
+            } else {
+                currentX = clientX - startX;
+                
+                const threshold = 50;
+                const dragDistance = Math.abs(currentX);
+                
+                if (dragDistance > threshold) {
+                    if (currentX > 0) {
+                        // Dragging right - go to previous image
+                        currentImageIndex = (currentImageIndex - 1 + images.length) % images.length;
+                    } else {
+                        // Dragging left - go to next image
+                        currentImageIndex = (currentImageIndex + 1) % images.length;
+                    }
+                    
+                    loadImage(currentImageIndex);
+                    currentX = 0;
+                    startX = clientX;
+                }
+            }
+        }
+
+        function handleDragEnd() {
+            isDragging = false;
+            isPanning = false;
+            bikeViewer.classList.remove('grabbing');
+            currentX = 0;
+        }
+
+        function zoom(delta) {
+            zoomLevel = Math.max(1, Math.min(3, zoomLevel + delta));
+            
+            if (zoomLevel === 1) {
+                panX = 0;
+                panY = 0;
+            }
+            
+            updateTransform();
+        }
+
+        function resetView() {
+            zoomLevel = 1;
+            panX = 0;
+            panY = 0;
+            updateTransform();
+        }
+
+        function updateTransform() {
+            imageContainer.style.transform = `scale(${zoomLevel}) translate(${panX / zoomLevel}px, ${panY / zoomLevel}px)`;
+        }
+
+        // Initialize the viewer
+        function init() {
+            // Verify all critical elements exist
+            if (!bikeViewer || !bikeImage || !imageContainer || !tooltip) {
+                console.error('Critical elements not found');
+                return;
+            }
+            
+            loadImage(currentImageIndex);
+            createRotationDots();
+            createHotspots();
+            setupEventListeners();
+        }
+        
+        // Wait for DOM to be fully loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>

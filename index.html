@@ -124,6 +124,8 @@
             border: 1px solid rgba(226, 232, 240, 0.8);
             backdrop-filter: blur(10px);
             transition: box-shadow 0.3s ease;
+            /* Ensure tooltips stay contained */
+            contain: layout;
         }
 
         .bike-viewer:hover {
@@ -230,7 +232,8 @@
                 0 0 0 1px rgba(0, 0, 0, 0.05),
                 0 12px 32px rgba(0, 0, 0, 0.15);
             z-index: 1000;
-            max-width: 260px;
+            max-width: min(260px, calc(100% - 20px)); /* Responsive to container */
+            width: max-content;
             border: 1px solid rgba(226, 232, 240, 0.8);
             opacity: 0;
             pointer-events: none;
@@ -469,7 +472,7 @@
             }
 
             .tooltip {
-                max-width: 240px;
+                max-width: 90%; /* Use percentage for narrow widgets */
                 padding: 14px;
             }
 
@@ -528,8 +531,18 @@
             }
 
             .tooltip {
-                max-width: 220px;
+                max-width: 95%; /* Even more responsive on tiny screens */
                 padding: 12px;
+            }
+        }
+
+        /* Extra constraint for very narrow widgets (300px) */
+        @media (max-width: 350px) {
+            .tooltip {
+                max-width: calc(100% - 20px);
+                left: 10px !important;
+                right: 10px !important;
+                transform: none !important;
             }
         }
     </style>
@@ -540,7 +553,7 @@
             <div class="header-icon">
                 <i class="fa-solid fa-motorcycle"></i>
             </div>
-            <h1>Bronco E-Bike Interactive Guide</h1>
+            <h1>E-Bike Interactive Guide</h1>
             <div class="header-instructions">
                 <div class="instruction-item">
                     <i class="fa-solid fa-arrows-rotate"></i>
@@ -558,7 +571,7 @@
     <div class="viewer-container">
         <div class="bike-viewer" id="bikeViewer">
             <div class="bike-image-container" id="imageContainer">
-                <img id="bikeImage" class="bike-image" alt="Bronco Bike">
+                <img id="bikeImage" class="bike-image" alt="eBike">
             </div>
 
             <!-- Hotspots will be dynamically added here -->
@@ -596,11 +609,11 @@
     <script>
         // Image paths - these should be updated to match your hosted images
         const images = [
-            'MB_BRONCO_BIKE_-_AREA_51.426_25bf555b-ecb1-4d1e-a169-5b392583f85a.webp',
-            'MB_BRONCO_BIKE_-_AREA_51.427_7f59fd7d-6739-47c6-95ff-331f261a1059.webp',
-            'MB_BRONCO_BIKE.408_ff023f33-9da1-4ec3-98be-dcd124520e5c.webp',
-            'MB_BRONCO_BIKE_-_AREA_51.428_34701322-91b6-48a5-83b0-a0e2e1a30f8a.webp',
-            'MB_BRONCO_BIKE.5_4_efaa3fa7-72db-4b54-8526-fec996420777.webp'
+            'MB_BRONCO_BIKE_-_AREA_51_426_25bf555b-ecb1-4d1e-a169-5b392583f85a.webp',
+            'MB_BRONCO_BIKE_-_AREA_51_427_7f59fd7d-6739-47c6-95ff-331f261a1059.webp',
+            'MB_BRONCO_BIKE_408_ff023f33-9da1-4ec3-98be-dcd124520e5c.webp',
+            'MB_BRONCO_BIKE_-_AREA_51_428_34701322-91b6-48a5-83b0-a0e2e1a30f8a.webp',
+            'MB_BRONCO_BIKE_5_4_efaa3fa7-72db-4b54-8526-fec996420777.webp'
         ];
 
         // Hotspot data with positions for each view
@@ -721,10 +734,22 @@
         }
 
         function loadImage(index) {
-            bikeImage.src = images[index];
-            currentImageIndex = index;
-            updateRotationDots();
-            updateHotspots();
+            const imagePath = images[index];
+            console.log('Loading image:', imagePath); // Debug log
+            
+            bikeImage.onload = function() {
+                console.log('Image loaded successfully:', imagePath);
+                currentImageIndex = index;
+                updateRotationDots();
+                updateHotspots();
+            };
+            
+            bikeImage.onerror = function() {
+                console.error('Failed to load image:', imagePath);
+                console.error('Check that the file exists and the path is correct');
+            };
+            
+            bikeImage.src = imagePath;
         }
 
         function createRotationDots() {
@@ -784,19 +809,46 @@
             tooltipDesc.textContent = hotspot.description;
             tooltipLink.href = hotspot.link;
 
-            // Position tooltip relative to viewer
+            // Make tooltip visible (but transparent) to get dimensions
+            tooltip.style.opacity = '0';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.classList.add('active');
+            
+            // Get positions and dimensions
             const rect = element.getBoundingClientRect();
             const viewerRect = bikeViewer.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
             
-            let left = rect.left - viewerRect.left + rect.width / 2;
-            let top = rect.top - viewerRect.top - 20;
+            // Calculate initial position (centered above hotspot)
+            let left = rect.left - viewerRect.left - (tooltipRect.width / 2) + (rect.width / 2);
+            let top = rect.top - viewerRect.top - tooltipRect.height - 10;
             
-            // Make sure tooltip stays in bounds
-            tooltip.style.left = Math.max(10, Math.min(left, viewerRect.width - 330)) + 'px';
-            tooltip.style.top = Math.max(10, top) + 'px';
-            tooltip.style.transform = 'translateX(-50%)';
+            // Constrain horizontally - keep tooltip fully within viewer
+            const padding = 10;
             
-            tooltip.classList.add('active');
+            // If tooltip would go off right edge, shift it left
+            if (left + tooltipRect.width > viewerRect.width - padding) {
+                left = viewerRect.width - tooltipRect.width - padding;
+            }
+            
+            // If tooltip would go off left edge, shift it right
+            if (left < padding) {
+                left = padding;
+            }
+            
+            // If tooltip would go off top, position below hotspot instead
+            if (top < padding) {
+                top = rect.bottom - viewerRect.top + 10;
+            }
+            
+            // Apply positioning
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+            tooltip.style.transform = 'none';
+            
+            // Now make it fully visible
+            tooltip.style.opacity = '';
+            tooltip.style.pointerEvents = '';
 
             // Stop pulse animation
             element.classList.remove('pulse');
